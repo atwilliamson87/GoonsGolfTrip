@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Golf Trip Cup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --fairway:#1f4d36;
+    --fairway-dark:#153524;
+    --cream:#f4efe1;
+    --ink:#1c1b17;
+    --flag:#bd3d28;
+    --sand:#b8a369;
+    --line:rgba(28,27,23,0.14);
+    --teamA:#1f4d36;
+    --teamB:#bd3d28;
+    --ok:#2f6b3e;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--cream);
+    color:var(--ink);
+    font-family:'Archivo',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.display{
+    font-family:'Anton',sans-serif;
+    font-weight:400;
+    letter-spacing:0.02em;
+    text-transform:uppercase;
+  }
+  .mono{font-family:'JetBrains Mono',monospace;}
+  a{color:inherit;}
+
+  /* ===== Header / scoreboard ===== */
+  .topbar{
+    background:var(--fairway);
+    color:var(--cream);
+    padding:18px 16px 0;
+    position:relative;
+    overflow:hidden;
+  }
+  .topbar::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.035) 0 2px, transparent 2px 42px);
+    pointer-events:none;
+  }
+  .topbar-inner{max-width:760px;margin:0 auto;position:relative;}
+  .title-row{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+  .title-row h1{margin:0;font-size:clamp(28px,7vw,42px);line-height:0.95;}
+  .subtitle{font-size:12px;opacity:0.75;letter-spacing:0.14em;text-transform:uppercase;margin-top:2px;}
+
+  .score-strip{
+    margin:16px 0 0;
+    border-radius:10px;
+    overflow:hidden;
+    display:flex;
+    box-shadow:0 2px 0 rgba(0,0,0,0.15) inset;
+  }
+  .strip-seg{
+    padding:14px 10px;
+    text-align:center;
+    position:relative;
+    min-width:64px;
+  }
+  .strip-a{background:var(--teamA);}
+  .strip-b{background:var(--teamB);}
+  .strip-a, .strip-b{color:var(--cream);flex:1;}
+  .strip-name{font-size:11px;letter-spacing:0.12em;text-transform:uppercase;opacity:0.85;}
+  .strip-pts{font-family:'Anton',sans-serif;font-size:clamp(30px,9vw,44px);line-height:1;margin-top:2px;}
+  .strip-mid{
+    background:var(--cream);color:var(--ink);
+    display:flex;align-items:center;justify-content:center;
+    padding:0 12px;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;
+    font-weight:700;flex:0 0 auto;
+  }
+
+  .tabs{
+    display:flex;
+    max-width:760px;
+    margin:16px auto 0;
+    gap:2px;
+  }
+  .tab{
+    flex:1;
+    text-align:center;
+    padding:12px 6px;
+    background:rgba(244,239,225,0.08);
+    color:var(--cream);
+    font-size:11px;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    font-weight:700;
+    cursor:pointer;
+    border-radius:8px 8px 0 0;
+    opacity:0.6;
+  }
+  .tab.active{background:var(--cream);color:var(--fairway-dark);opacity:1;}
+
+  main{max-width:760px;margin:0 auto;padding:18px 14px 60px;}
+
+  .card{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:16px;
+    margin-bottom:14px;
+  }
+  .card h3{margin:0 0 10px;font-size:18px;color:var(--fairway-dark);}
+  .muted{color:rgba(28,27,23,0.55);font-size:13px;}
+  .eyebrow{
+    font-size:10px;letter-spacing:0.14em;text-transform:uppercase;
+    color:var(--flag);font-weight:700;margin-bottom:4px;
+  }
+
+  .day-toggle{display:flex;gap:8px;margin-bottom:14px;}
+  .day-btn{
+    flex:1;padding:10px;border-radius:8px;border:1px solid var(--line);
+    background:#fff;text-align:center;font-weight:700;cursor:pointer;font-size:13px;
+    text-transform:uppercase;letter-spacing:0.06em;
+  }
+  .day-btn.active{background:var(--fairway);color:var(--cream);border-color:var(--fairway);}
+
+  .match-row{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:12px 0;border-top:1px solid var(--line);gap:10px;
+  }
+  .match-row:first-of-type{border-top:none;}
+  .match-players{font-size:14px;}
+  .match-players .vs{color:rgba(28,27,23,0.4);font-size:11px;margin:0 4px;}
+  .status-pill{
+    font-size:10px;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;
+    padding:4px 8px;border-radius:20px;white-space:nowrap;
+  }
+  .status-final{background:#e3efe6;color:var(--ok);}
+  .status-progress{background:#fbe9d8;color:#8a5a1e;}
+  .status-open{background:#f0eee6;color:rgba(28,27,23,0.5);}
+  .btn{
+    background:var(--fairway);color:var(--cream);border:none;border-radius:7px;
+    padding:9px 14px;font-weight:700;font-size:12px;text-transform:uppercase;
+    letter-spacing:0.06em;cursor:pointer;
+  }
+  .btn.secondary{background:transparent;color:var(--fairway);border:1px solid var(--fairway);}
+  .btn.flag{background:var(--flag);}
+  .btn:active{transform:translateY(1px);}
+  .btn[disabled]{opacity:0.4;cursor:default;}
+
+  /* Scorecard entry */
+  .scorecard-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;}
+  table.card-table{border-collapse:collapse;width:100%;min-width:720px;}
+  table.card-table th, table.card-table td{
+    border-bottom:1px solid var(--line);
+    padding:6px 4px;text-align:center;font-size:13px;
+  }
+  table.card-table th{
+    background:#faf8f2;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;
+    color:rgba(28,27,23,0.6);position:sticky;top:0;
+  }
+  table.card-table td.player-name, table.card-table th.player-name{
+    text-align:left;position:sticky;left:0;background:#fff;font-weight:700;font-size:12px;
+    min-width:120px;padding-left:10px;
+  }
+  table.card-table th.player-name{background:#faf8f2;}
+  table.card-table input{
+    width:36px;text-align:center;border:1px solid var(--line);border-radius:5px;
+    padding:5px 2px;font-family:'JetBrains Mono',monospace;font-size:13px;
+  }
+  .nine-label{
+    display:inline-block;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;
+    color:var(--sand);font-weight:700;margin:14px 0 4px;
+  }
+  .save-row{display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:10px;}
+  .result-chip{
+    font-size:12px;font-weight:700;padding:3px 9px;border-radius:20px;
+  }
+
+  /* Setup */
+  .roster-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .roster-col h4{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;}
+  .roster-col.a h4{color:var(--teamA);}
+  .roster-col.b h4{color:var(--teamB);}
+  .roster-col input{
+    width:100%;padding:8px 9px;margin-bottom:6px;border:1px solid var(--line);
+    border-radius:6px;font-size:13px;font-family:'Archivo',sans-serif;
+  }
+  .pairing-block{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;}
+  .pairing-match{
+    display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;
+    padding:10px;background:#faf8f2;border-radius:8px;
+  }
+  .pairing-match select{width:100%;padding:6px;font-size:12px;border-radius:5px;border:1px solid var(--line);margin-bottom:4px;}
+  .pairing-label{font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:rgba(28,27,23,0.5);margin-bottom:4px;}
+
+  .toast{
+    position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
+    background:var(--fairway-dark);color:var(--cream);padding:10px 18px;
+    border-radius:30px;font-size:13px;font-weight:600;opacity:0;pointer-events:none;
+    transition:opacity 0.25s ease, transform 0.25s ease;z-index:50;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px);}
+
+  .rules-note{font-size:12px;color:rgba(28,27,23,0.6);line-height:1.5;margin-top:6px;}
+  .back-link{font-size:12px;font-weight:700;color:var(--fairway);cursor:pointer;display:inline-block;margin-bottom:10px;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="title-row">
+      <h1>Golf Trip Cup</h1>
+    </div>
+    <div class="subtitle" id="setupLine">16 players · 2 teams · 2 days</div>
+    <div class="score-strip" id="scoreStrip"></div>
+    <div class="tabs" id="tabs">
+      <div class="tab" data-tab="leaderboard">Leaderboard</div>
+      <div class="tab" data-tab="cards">Scorecards</div>
+      <div class="tab" data-tab="setup">Setup</div>
+    </div>
+  </div>
+</div>
+
+<main id="main"></main>
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   STATE
+   ========================================================= */
+const STORAGE_KEY = 'trip-data';
+let state = null;
+let currentTab = 'leaderboard';
+let currentDay = 1;
+let openMatchId = null; // "1-2" (day-matchIndex) when editing a scorecard
+
+function emptyMatch(){ return { teamA:['',''], teamB:['',''], scores:{} }; }
+
+function defaultState(){
+  return {
+    teams:{ A:{name:'Team Red', players:['Player 1','Player 2','Player 3','Player 4','Player 5','Player 6','Player 7','Player 8']},
+            B:{name:'Team Blue', players:['Player 9','Player 10','Player 11','Player 12','Player 13','Player 14','Player 15','Player 16']} },
+    days:{
+      1:{ matches:[emptyMatch(),emptyMatch(),emptyMatch(),emptyMatch()] },
+      2:{ matches:[emptyMatch(),emptyMatch(),emptyMatch(),emptyMatch()] }
+    }
+  };
+}
+
+async function loadState(){
+  try{
+    const res = await window.storage.get(STORAGE_KEY, true);
+    state = res ? JSON.parse(res.value) : defaultState();
+  }catch(e){
+    state = defaultState();
+  }
+  render();
+}
+
+async function saveState(msg){
+  try{
+    // re-fetch first to reduce clobbering someone else's concurrent edit
+    let latest = state;
+    try{
+      const res = await window.storage.get(STORAGE_KEY, true);
+      if(res) latest = JSON.parse(res.value);
+    }catch(e){ /* no existing value yet */ }
+    // merge: our in-memory `state` wins for the parts we just edited,
+    // but we still write the whole object since edits are per-screen.
+    await window.storage.set(STORAGE_KEY, JSON.stringify(state), true);
+    if(msg) showToast(msg);
+  }catch(e){
+    showToast('Could not save — check connection');
+  }
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._h);
+  showToast._h = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+/* =========================================================
+   SCORING LOGIC
+   Front nine (holes 0-8)  -> best ball match play
+   Back nine  (holes 9-17) -> hi-lo match play
+   Win = 2 pts, Tie = 1 pt each, per nine, per match
+   ========================================================= */
+function holeScores(match, holeIdx){
+  const aNames = match.teamA, bNames = match.teamB;
+  const get = (name, hi) => {
+    const arr = match.scores[name];
+    const v = arr ? arr[hi] : '';
+    return (v === '' || v === undefined || v === null) ? null : Number(v);
+  };
+  const a = aNames.map(n => n ? get(n, holeIdx) : null);
+  const b = bNames.map(n => n ? get(n, holeIdx) : null);
+  return {a, b};
+}
+
+function computeNine(match, mode){
+  // mode: 'bestball' (holes 0-8) or 'hilo' (holes 9-17)
+  const holes = mode === 'bestball' ? [0,1,2,3,4,5,6,7,8] : [9,10,11,12,13,14,15,16,17];
+  let holesPlayed = 0, aHoles = 0, bHoles = 0, halved = 0;
+  for(const hi of holes){
+    const {a,b} = holeScores(match, hi);
+    const aFilled = a.every(v => v !== null) && a.length === 2;
+    const bFilled = b.every(v => v !== null) && b.length === 2;
+    if(!aFilled || !bFilled) continue; // hole not fully entered yet
+    holesPlayed++;
+    if(mode === 'bestball'){
+      const aBest = Math.min(...a), bBest = Math.min(...b);
+      if(aBest < bBest) aHoles++;
+      else if(bBest < aBest) bHoles++;
+      else halved++;
+    } else {
+      const aLow = Math.min(...a), aHigh = Math.max(...a);
+      const bLow = Math.min(...b), bHigh = Math.max(...b);
+      // low-ball point
+      if(aLow < bLow) aHoles++;
+      else if(bLow < aLow) bHoles++;
+      else halved++;
+      // high-ball point
+      if(aHigh < bHigh) aHoles++;
+      else if(bHigh < aHigh) bHoles++;
+      else halved++;
+    }
+  }
+  const totalHoles = holes.length;
+  const complete = holesPlayed === totalHoles;
+  let aPts = 0, bPts = 0, resultLabel = null;
+  if(complete){
+    if(aHoles > bHoles){ aPts = 2; bPts = 0; resultLabel = 'Team A win'; }
+    else if(bHoles > aHoles){ aPts = 0; bPts = 2; resultLabel = 'Team B win'; }
+    else { aPts = 1; bPts = 1; resultLabel = 'Halved'; }
+  }
+  return { holesPlayed, totalHoles, aHoles, bHoles, complete, aPts, bPts, resultLabel };
+}
+
+function matchStatus(match){
+  const bb = computeNine(match, 'bestball');
+  const hl = computeNine(match, 'hilo');
+  const anyPlayed = bb.holesPlayed > 0 || hl.holesPlayed > 0;
+  const allDone = bb.complete && hl.complete;
+  return {
+    bb, hl,
+    label: allDone ? 'Final' : (anyPlayed ? 'In progress' : 'Not started'),
+    aPts: bb.aPts + hl.aPts,
+    bPts: bb.bPts + hl.bPts
+  };
+}
+
+function tripTotals(){
+  let aTotal = 0, bTotal = 0;
+  [1,2].forEach(d=>{
+    state.days[d].matches.forEach(m=>{
+      const s = matchStatus(m);
+      aTotal += s.aPts; bTotal += s.bPts;
+    });
+  });
+  return {aTotal, bTotal};
+}
+
+/* =========================================================
+   RENDER: score strip (always visible)
+   ========================================================= */
+function renderScoreStrip(){
+  const {aTotal, bTotal} = tripTotals();
+  const nameA = state.teams.A.name || 'Team A';
+  const nameB = state.teams.B.name || 'Team B';
+  document.getElementById('scoreStrip').innerHTML = `
+    <div class="strip-seg strip-a">
+      <div class="strip-name">${escapeHtml(nameA)}</div>
+      <div class="strip-pts">${aTotal}</div>
+    </div>
+    <div class="strip-mid">of 32</div>
+    <div class="strip-seg strip-b">
+      <div class="strip-name">${escapeHtml(nameB)}</div>
+      <div class="strip-pts">${bTotal}</div>
+    </div>`;
+}
+
+function escapeHtml(s){
+  return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* =========================================================
+   RENDER: Leaderboard tab
+   ========================================================= */
+function renderLeaderboard(){
+  const nameA = state.teams.A.name || 'Team A';
+  const nameB = state.teams.B.name || 'Team B';
+  let html = '';
+
+  [1,2].forEach(day=>{
+    html += `<div class="card"><h3>Day ${day}</h3>`;
+    const matches = state.days[day].matches;
+    const anySetup = matches.some(m => m.teamA[0] || m.teamB[0]);
+    if(!anySetup){
+      html += `<p class="muted">Foursomes for Day ${day} haven't been set up yet. Head to Setup.</p>`;
+    } else {
+      matches.forEach((m, idx)=>{
+        const s = matchStatus(m);
+        const pillClass = s.label === 'Final' ? 'status-final' : (s.label === 'In progress' ? 'status-progress' : 'status-open');
+        const aNames = m.teamA.filter(Boolean).join(' & ') || '—';
+        const bNames = m.teamB.filter(Boolean).join(' & ') || '—';
+        html += `<div class="match-row">
+          <div class="match-players">
+            <div><b>${escapeHtml(aNames)}</b><span class="vs">vs</span><b>${escapeHtml(bNames)}</b></div>
+            <div class="muted">Match ${idx+1} · ${nameA} ${s.aPts}–${s.bPts} ${nameB}</div>
+          </div>
+          <span class="status-pill ${pillClass}">${s.label}</span>
+        </div>`;
+      });
+    }
+    html += `</div>`;
+  });
+
+  html += `<div class="rules-note">
+    <b>How scoring works:</b> Each foursome (2 vs 2) plays a full 18. The front nine is scored
+    best-ball match play (each side's lower score wins the hole). The back nine is hi-lo
+    (low ball vs low ball, and high ball vs high ball, each worth a point). Each nine is worth
+    2 points for a win, 1 point each for a tie — 4 points per match, 16 per day, 32 for the trip.
+  </div>`;
+
+  document.getElementById('main').innerHTML = html;
+}
+
+/* =========================================================
+   RENDER: Scorecards tab (list + entry)
+   ========================================================= */
+function renderCards(){
+  if(openMatchId){
+    renderScorecardEntry(openMatchId);
+    return;
+  }
+  const nameA = state.teams.A.name || 'Team A';
+  const nameB = state.teams.B.name || 'Team B';
+
+  let html = `<div class="day-toggle">
+    <div class="day-btn ${currentDay===1?'active':''}" onclick="setDay(1)">Day 1</div>
+    <div class="day-btn ${currentDay===2?'active':''}" onclick="setDay(2)">Day 2</div>
+  </div>`;
+
+  html += `<div class="card"><h3>Foursomes — Day ${currentDay}</h3>`;
+  const matches = state.days[currentDay].matches;
+  const anySetup = matches.some(m => m.teamA[0] || m.teamB[0]);
+  if(!anySetup){
+    html += `<p class="muted">No foursomes set up for this day yet. Go to Setup to add rosters and pairings.</p>`;
+  } else {
+    matches.forEach((m, idx)=>{
+      const s = matchStatus(m);
+      const pillClass = s.label === 'Final' ? 'status-final' : (s.label === 'In progress' ? 'status-progress' : 'status-open');
+      const aNames = m.teamA.filter(Boolean).join(' & ') || '(names not set)';
+      const bNames = m.teamB.filter(Boolean).join(' & ') || '(names not set)';
+      html += `<div class="match-row">
+        <div class="match-players">
+          <div><b>${escapeHtml(aNames)}</b><span class="vs">vs</span><b>${escapeHtml(bNames)}</b></div>
+          <div class="muted">${s.bb.holesPlayed}/9 front · ${s.hl.holesPlayed}/9 back</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="status-pill ${pillClass}">${s.label}</span>
+          <button class="btn secondary" onclick="openMatch(${currentDay},${idx})">Enter</button>
+        </div>
+      </div>`;
+    });
+  }
+  html += `</div>`;
+  document.getElementById('main').innerHTML = html;
+}
+
+function setDay(d){ currentDay = d; renderCards(); }
+
+function openMatch(day, idx){
+  openMatchId = day + '-' + idx;
+  renderCards();
+}
+
+function closeMatch(){
+  openMatchId = null;
+  renderCards();
+}
+
+function renderScorecardEntry(id){
+  const [day, idx] = id.split('-').map(Number);
+  const match = state.days[day].matches[idx];
+  const nameA = state.teams.A.name || 'Team A';
+  const nameB = state.teams.B.name || 'Team B';
+  const allPlayers = [...match.teamA, ...match.teamB];
+
+  if(!match.scores) match.scores = {};
+  allPlayers.forEach(p=>{
+    if(p && !match.scores[p]) match.scores[p] = new Array(18).fill('');
+  });
+
+  const bb = computeNine(match, 'bestball');
+  const hl = computeNine(match, 'hilo');
+
+  let html = `<div class="back-link" onclick="closeMatch()">&larr; Back to Day ${day} foursomes</div>`;
+  html += `<div class="card"><h3>Day ${day} · Match ${idx+1}</h3>
+    <p class="muted">${escapeHtml(match.teamA.filter(Boolean).join(' & ') || 'Team A pair')} vs
+    ${escapeHtml(match.teamB.filter(Boolean).join(' & ') || 'Team B pair')}</p>`;
+
+  if(allPlayers.some(p=>!p)){
+    html += `<p class="muted">Some player names for this match are blank — add them in Setup for cleaner scoring.</p>`;
+  }
+
+  // FRONT NINE
+  html += `<div class="nine-label">Front nine · best ball</div>`;
+  html += buildScoreTable(match, allPlayers, 0, 9, day, idx);
+  html += `<div class="save-row">
+    <span class="muted">${bb.holesPlayed}/9 holes entered</span>
+    ${bb.complete ? `<span class="result-chip" style="background:#e3efe6;color:var(--ok);">${bb.resultLabel} · ${nameA} ${bb.aPts}–${bb.bPts} ${nameB}</span>` : ''}
+  </div>`;
+
+  // BACK NINE
+  html += `<div class="nine-label">Back nine · hi-lo</div>`;
+  html += buildScoreTable(match, allPlayers, 9, 18, day, idx);
+  html += `<div class="save-row">
+    <span class="muted">${hl.holesPlayed}/9 holes entered</span>
+    ${hl.complete ? `<span class="result-chip" style="background:#e3efe6;color:var(--ok);">${hl.resultLabel} · ${nameA} ${hl.aPts}–${hl.bPts} ${nameB}</span>` : ''}
+  </div>`;
+
+  html += `<div class="save-row">
+    <span class="muted">Scores save for everyone on the trip.</span>
+    <button class="btn" onclick="saveMatch(${day},${idx})">Save scorecard</button>
+  </div>`;
+  html += `</div>`;
+
+  document.getElementById('main').innerHTML = html;
+}
+
+function buildScoreTable(match, players, startHole, endHole, day, idx){
+  let head = `<th class="player-name">Hole</th>`;
+  for(let h=startHole; h<endHole; h++) head += `<th>${h+1}</th>`;
+  let rows = '';
+  players.forEach(p=>{
+    if(!p) return;
+    rows += `<tr><td class="player-name">${escapeHtml(p)}</td>`;
+    for(let h=startHole; h<endHole; h++){
+      const val = (match.scores[p] && match.scores[p][h] !== undefined) ? match.scores[p][h] : '';
+      rows += `<td><input type="number" min="1" max="15" inputmode="numeric" value="${val}"
+        onchange="setScore(${day},${idx},'${escapeAttr(p)}',${h},this.value)"></td>`;
+    }
+    rows += `</tr>`;
+  });
+  return `<div class="scorecard-wrap"><table class="card-table"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function escapeAttr(s){ return (s||'').replace(/'/g, "\\'"); }
+
+function setScore(day, idx, player, holeIdx, value){
+  const match = state.days[day].matches[idx];
+  if(!match.scores[player]) match.scores[player] = new Array(18).fill('');
+  match.scores[player][holeIdx] = value === '' ? '' : Number(value);
+  // live-update the result chips without a full save yet
+  renderScorecardEntry(day + '-' + idx);
+  renderScoreStrip();
+}
+
+async function saveMatch(day, idx){
+  await saveState('Scorecard saved');
+  renderScoreStrip();
+}
+
+/* =========================================================
+   RENDER: Setup tab
+   ========================================================= */
+function renderSetup(){
+  let html = `<div class="card"><h3>Rosters</h3><div class="roster-grid">`;
+  ['A','B'].forEach(key=>{
+    html += `<div class="roster-col ${key.toLowerCase()}">
+      <input value="${escapeHtml(state.teams[key].name)}" placeholder="Team ${key} name"
+        style="font-weight:700;margin-bottom:10px;" onchange="setTeamName('${key}', this.value)">`;
+    state.teams[key].players.forEach((p, i)=>{
+      html += `<input value="${escapeHtml(p)}" placeholder="Player ${i+1}"
+        onchange="setPlayerName('${key}',${i}, this.value)">`;
+    });
+    html += `</div>`;
+  });
+  html += `</div></div>`;
+
+  [1,2].forEach(day=>{
+    html += `<div class="card"><h3>Day ${day} foursomes</h3>
+      <p class="muted" style="margin-top:-6px;">Pick 2 ${escapeHtml(state.teams.A.name)} players and 2 ${escapeHtml(state.teams.B.name)} players for each match.</p>
+      <div class="pairing-block">`;
+    state.days[day].matches.forEach((m, idx)=>{
+      html += `<div class="pairing-match">
+        <div>
+          <div class="pairing-label" style="color:var(--teamA);">${escapeHtml(state.teams.A.name)} pair — Match ${idx+1}</div>
+          ${playerSelect(day, idx, 'teamA', 0, m.teamA[0])}
+          ${playerSelect(day, idx, 'teamA', 1, m.teamA[1])}
+        </div>
+        <div>
+          <div class="pairing-label" style="color:var(--teamB);">${escapeHtml(state.teams.B.name)} pair — Match ${idx+1}</div>
+          ${playerSelect(day, idx, 'teamB', 0, m.teamB[0])}
+          ${playerSelect(day, idx, 'teamB', 1, m.teamB[1])}
+        </div>
+      </div>`;
+    });
+    html += `</div></div>`;
+  });
+
+  html += `<div class="card">
+    <div class="save-row" style="margin-top:0;">
+      <span class="muted">Changes here are shared with everyone.</span>
+      <button class="btn flag" onclick="saveSetup()">Save setup</button>
+    </div>
+  </div>`;
+
+  document.getElementById('main').innerHTML = html;
+}
+
+function playerSelect(day, idx, teamKey, slot, current){
+  const teamLetter = teamKey === 'teamA' ? 'A' : 'B';
+  const players = state.teams[teamLetter].players.filter(Boolean);
+  let opts = `<option value="">Select player</option>`;
+  players.forEach(p=>{
+    opts += `<option value="${escapeHtml(p)}" ${p===current?'selected':''}>${escapeHtml(p)}</option>`;
+  });
+  return `<select onchange="setPairing(${day},${idx},'${teamKey}',${slot}, this.value)">${opts}</select>`;
+}
+
+function setTeamName(key, val){ state.teams[key].name = val; }
+function setPlayerName(key, i, val){ state.teams[key].players[i] = val; }
+function setPairing(day, idx, teamKey, slot, val){
+  state.days[day].matches[idx][teamKey][slot] = val;
+}
+
+async function saveSetup(){
+  await saveState('Setup saved for everyone');
+  renderScoreStrip();
+  document.getElementById('setupLine').textContent =
+    `${state.teams.A.name} vs ${state.teams.B.name} · 16 players · 2 days`;
+}
+
+/* =========================================================
+   TABS + INIT
+   ========================================================= */
+function render(){
+  renderScoreStrip();
+  document.querySelectorAll('.tab').forEach(t=>{
+    t.classList.toggle('active', t.dataset.tab === currentTab);
+  });
+  if(currentTab === 'leaderboard') renderLeaderboard();
+  else if(currentTab === 'cards') renderCards();
+  else renderSetup();
+}
+
+document.getElementById('tabs').addEventListener('click', (e)=>{
+  const tab = e.target.closest('.tab');
+  if(!tab) return;
+  currentTab = tab.dataset.tab;
+  openMatchId = null;
+  render();
+});
+
+loadState();
+
+// light polling so everyone sees new scores without a manual refresh
+setInterval(async ()=>{
+  if(openMatchId) return; // don't yank the table out from under someone typing
+  try{
+    const res = await window.storage.get(STORAGE_KEY, true);
+    if(res){
+      const fresh = JSON.stringify(JSON.parse(res.value));
+      if(fresh !== JSON.stringify(state)){
+        state = JSON.parse(fresh);
+        render();
+      }
+    }
+  }catch(e){ /* ignore */ }
+}, 7000);
+</script>
+</body>
+</html>
