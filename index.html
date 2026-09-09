@@ -140,6 +140,14 @@
     display:flex;align-items:center;justify-content:space-between;
     padding:12px 0;border-top:1px solid var(--line);gap:10px;
   }
+  .match-score{
+    display:flex;align-items:baseline;gap:5px;
+    font-family:'Libre Baskerville',Georgia,serif;
+    font-size:22px;line-height:1;white-space:nowrap;
+  }
+  .match-score .a{color:var(--teamA);font-weight:700;}
+  .match-score .b{color:var(--teamB-ink);font-weight:700;}
+  .match-score .sep{color:rgba(32,38,37,0.3);font-size:15px;}
   .match-row:first-of-type{border-top:none;}
   .match-players{font-size:14px;}
   .match-players .vs{color:rgba(32,38,37,0.4);font-size:11px;margin:0 4px;}
@@ -200,6 +208,21 @@
 
   .setup-crest{display:flex;justify-content:center;margin-bottom:16px;}
   .setup-crest img{width:88px;height:auto;}
+
+  .roster-line{
+    display:flex;justify-content:space-between;align-items:baseline;
+    gap:10px;padding:6px 0;border-top:1px solid var(--line);
+  }
+  .roster-line:first-of-type{border-top:none;padding-top:0;}
+  .roster-line .name{font-size:14px;}
+  .score{
+    font-family:ui-monospace,'Courier New',monospace;
+    font-weight:700;font-size:15px;color:var(--ink);white-space:nowrap;
+  }
+  .thru{
+    font-size:10px;font-weight:600;color:rgba(32,38,37,0.45);
+    text-transform:uppercase;letter-spacing:0.04em;margin-left:5px;
+  }
 
   /* Setup */
   .team-name-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:4px;}
@@ -518,10 +541,10 @@ function playerTotalStrokes(name){
 
 function playerRosterLine(name){
   const s = playerTotalStrokes(name);
-  const scoreLabel = s.holes > 0
-    ? ` <span class="muted">— ${s.total} thru ${s.holes}</span>`
+  const scoreHtml = s.holes > 0
+    ? `<span class="score">${s.total}<span class="thru">thru ${s.holes}</span></span>`
     : '';
-  return `<div style="padding:4px 0;">${escapeHtml(name)}${scoreLabel}</div>`;
+  return `<div class="roster-line"><span class="name">${escapeHtml(name)}</span>${scoreHtml}</div>`;
 }
 
 /* =========================================================
@@ -565,10 +588,13 @@ function renderLeaderboard(){
         const bNames = m.teamB.filter(Boolean).join(' & ') || '—';
         html += `<div class="match-row">
           <div class="match-players">
-            <div><b>${escapeHtml(aNames)}</b><span class="vs">vs</span><b>${escapeHtml(bNames)}</b></div>
-            <div class="muted">Match ${idx+1} · ${teamName('A')} ${s.aPts}–${s.bPts} ${teamName('B')}</div>
+            <div><b style="color:var(--teamA);">${escapeHtml(aNames)}</b><span class="vs">vs</span><b style="color:var(--teamB-ink);">${escapeHtml(bNames)}</b></div>
+            <div class="muted" style="margin-top:2px;">Match ${idx+1}</div>
           </div>
-          <span class="status-pill ${pillClass}">${s.label}</span>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="match-score"><span class="a">${s.aPts}</span><span class="sep">&ndash;</span><span class="b">${s.bPts}</span></div>
+            <span class="status-pill ${pillClass}">${s.label}</span>
+          </div>
         </div>`;
       });
     }
@@ -614,7 +640,7 @@ function renderCards(){
       const bNames = m.teamB.filter(Boolean).join(' & ') || '(names not set)';
       html += `<div class="match-row">
         <div class="match-players">
-          <div><b>${escapeHtml(aNames)}</b><span class="vs">vs</span><b>${escapeHtml(bNames)}</b></div>
+          <div><b style="color:var(--teamA);">${escapeHtml(aNames)}</b><span class="vs">vs</span><b style="color:var(--teamB-ink);">${escapeHtml(bNames)}</b></div>
           <div class="muted">${s.bb.holesPlayed}/9 front · ${s.hl.holesPlayed}/9 back</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
@@ -655,8 +681,8 @@ function renderScorecardEntry(id){
 
   let html = `<div class="back-link" onclick="closeMatch()">&larr; Back to Day ${day} foursomes</div>`;
   html += `<div class="card"><h3>Day ${day} · Match ${idx+1}</h3>
-    <p class="muted">${escapeHtml(match.teamA.filter(Boolean).join(' & ') || 'Team A pair')} vs
-    ${escapeHtml(match.teamB.filter(Boolean).join(' & ') || 'Team B pair')}</p>`;
+    <p class="muted"><b style="color:var(--teamA);">${escapeHtml(match.teamA.filter(Boolean).join(' & ') || 'Team A pair')}</b> vs
+    <b style="color:var(--teamB-ink);">${escapeHtml(match.teamB.filter(Boolean).join(' & ') || 'Team B pair')}</b></p>`;
 
   if(allPlayers.some(p=>!p)){
     html += `<p class="muted">Some player names for this match are blank — add them in Setup for cleaner scoring.</p>`;
@@ -797,7 +823,7 @@ function renderSetupEditor(){
   state.roster.forEach((p, i)=>{
     const s = playerTotalStrokes(p.name);
     const scoreBadge = s.holes > 0
-      ? `<span class="muted" style="font-size:11px;white-space:nowrap;">${s.total} thru ${s.holes}</span>`
+      ? `<span class="score" style="font-size:13px;">${s.total}<span class="thru">thru ${s.holes}</span></span>`
       : '';
     html += `<div class="roster-row">
       <input value="${escapeHtml(p.name)}" placeholder="Player name" onchange="setRosterName(${i}, this.value)">
