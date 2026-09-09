@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -137,8 +138,11 @@
   .day-btn.active{background:var(--fairway);color:var(--cream);border-color:var(--fairway);}
 
   .match-row{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:12px 0;border-top:1px solid var(--line);gap:10px;
+    display:flex;flex-direction:column;gap:8px;
+    padding:12px 0;border-top:1px solid var(--line);
+  }
+  .match-row-actions{
+    display:flex;align-items:center;justify-content:flex-end;gap:12px;
   }
   .match-score{
     display:flex;align-items:baseline;gap:5px;
@@ -210,14 +214,14 @@
   .setup-crest img{width:88px;height:auto;}
 
   .roster-line{
-    display:flex;justify-content:space-between;align-items:baseline;
-    gap:10px;padding:6px 0;border-top:1px solid var(--line);
+    display:flex;flex-direction:column;gap:1px;
+    padding:6px 0;border-top:1px solid var(--line);
   }
   .roster-line:first-of-type{border-top:none;padding-top:0;}
   .roster-line .name{font-size:14px;}
   .score{
     font-family:ui-monospace,'Courier New',monospace;
-    font-weight:700;font-size:15px;color:var(--ink);white-space:nowrap;
+    font-weight:700;font-size:14px;color:var(--ink);white-space:nowrap;
   }
   .thru{
     font-size:10px;font-weight:600;color:rgba(32,38,37,0.45);
@@ -591,7 +595,7 @@ function renderLeaderboard(){
             <div><b style="color:var(--teamA);">${escapeHtml(aNames)}</b><span class="vs">vs</span><b style="color:var(--teamB-ink);">${escapeHtml(bNames)}</b></div>
             <div class="muted" style="margin-top:2px;">Match ${idx+1}</div>
           </div>
-          <div style="display:flex;align-items:center;gap:12px;">
+          <div class="match-row-actions">
             <div class="match-score"><span class="a">${s.aPts}</span><span class="sep">&ndash;</span><span class="b">${s.bPts}</span></div>
             <span class="status-pill ${pillClass}">${s.label}</span>
           </div>
@@ -643,7 +647,7 @@ function renderCards(){
           <div><b style="color:var(--teamA);">${escapeHtml(aNames)}</b><span class="vs">vs</span><b style="color:var(--teamB-ink);">${escapeHtml(bNames)}</b></div>
           <div class="muted">${s.bb.holesPlayed}/9 front · ${s.hl.holesPlayed}/9 back</div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;">
+        <div class="match-row-actions">
           <span class="status-pill ${pillClass}">${s.label}</span>
           <button class="btn secondary" onclick="openMatch(${currentDay},${idx})">Enter</button>
         </div>
