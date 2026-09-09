@@ -17,7 +17,8 @@
     --sand:#D4A437;
     --line:rgba(32,38,37,0.14);
     --teamA:#B5121B;
-    --teamB:#003B31;
+    --teamB:#D4A437;
+    --teamB-ink:#8A6A1F;
     --ok:#1F6B45;
   }
   *{box-sizing:border-box;}
@@ -76,7 +77,9 @@
   }
   .strip-a{background:var(--teamA);}
   .strip-b{background:var(--teamB);}
-  .strip-a, .strip-b{color:var(--cream);flex:1;}
+  .strip-a, .strip-b{flex:1;}
+  .strip-a{color:var(--cream);}
+  .strip-b{color:var(--fairway-dark);}
   .strip-name{font-size:11px;letter-spacing:0.12em;text-transform:uppercase;opacity:0.85;}
   .strip-pts{font-family:'Anton',sans-serif;font-size:clamp(30px,9vw,44px);line-height:1;margin-top:2px;}
   .strip-mid{
@@ -205,7 +208,7 @@
     font-size:13px;font-weight:700;font-family:'Archivo',sans-serif;
   }
   .team-name-row .a input{border-color:var(--teamA);color:var(--teamA);}
-  .team-name-row .b input{border-color:var(--teamB);color:var(--teamB);}
+  .team-name-row .b input{border-color:var(--teamB-ink);color:var(--teamB-ink);}
   .roster-counts{font-size:12px;margin:2px 0 14px;color:rgba(32,38,37,0.55);}
   .roster-row{
     display:flex;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line);
@@ -223,7 +226,7 @@
     transition:background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   }
   .team-pill.active-a{background:var(--teamA);border-color:var(--teamA);color:#fff;}
-  .team-pill.active-b{background:var(--teamB);border-color:var(--teamB);color:#fff;}
+  .team-pill.active-b{background:var(--teamB);border-color:var(--teamB);color:var(--fairway-dark);}
   .pairing-block{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;}
   .pairing-match{
     display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;
@@ -242,6 +245,14 @@
 
   .rules-note{font-size:12px;color:rgba(32,38,37,0.6);line-height:1.5;margin-top:6px;}
   .back-link{font-size:12px;font-weight:700;color:var(--fairway);cursor:pointer;display:inline-block;margin-bottom:10px;}
+
+  .app-footer{text-align:center;padding:10px 14px 44px;}
+  .app-footer a{font-size:12px;color:rgba(32,38,37,0.32);cursor:pointer;text-decoration:underline;}
+  .admin-panel{
+    display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;
+    padding:12px;border:1px dashed var(--flag);border-radius:8px;background:#fdf1ef;
+  }
+  .admin-panel .muted{font-size:12px;}
 </style>
 </head>
 <body>
@@ -262,6 +273,7 @@
 </div>
 
 <main id="main"></main>
+<div class="app-footer" id="appFooter"></div>
 <div class="toast" id="toast"></div>
 
 <!-- Firebase (compat SDK — no build step needed) -->
@@ -308,7 +320,7 @@ function defaultRoster(){
 function defaultState(){
   return {
     roster: defaultRoster(),
-    teamNames: { A: 'Team Red', B: 'Team Green' },
+    teamNames: { A: 'Team Red', B: 'Team Gold' },
     days:{
       1:{ matches:[emptyMatch(),emptyMatch(),emptyMatch(),emptyMatch()] },
       2:{ matches:[emptyMatch(),emptyMatch(),emptyMatch(),emptyMatch()] }
@@ -398,7 +410,7 @@ function showToast(msg){
 }
 
 function teamName(letter){
-  return (state.teamNames && state.teamNames[letter]) || (letter === 'A' ? 'Team Red' : 'Team Green');
+  return (state.teamNames && state.teamNames[letter]) || (letter === 'A' ? 'Team Red' : 'Team Gold');
 }
 
 function rosterPlayers(letter){
@@ -727,7 +739,7 @@ function renderSetup(){
           ${playerSelect(day, idx, 'teamA', 1, m.teamA[1])}
         </div>
         <div>
-          <div class="pairing-label" style="color:var(--teamB);">${escapeHtml(teamName('B'))} pair — Match ${idx+1}</div>
+          <div class="pairing-label" style="color:var(--teamB-ink);">${escapeHtml(teamName('B'))} pair — Match ${idx+1}</div>
           ${playerSelect(day, idx, 'teamB', 0, m.teamB[0])}
           ${playerSelect(day, idx, 'teamB', 1, m.teamB[1])}
         </div>
@@ -785,6 +797,7 @@ function render(){
   if(currentTab === 'leaderboard') renderLeaderboard();
   else if(currentTab === 'cards') renderCards();
   else renderSetup();
+  renderFooter();
 }
 
 function switchTab(name){
@@ -798,6 +811,49 @@ document.getElementById('tabs').addEventListener('click', (e)=>{
   if(!tab) return;
   switchTab(tab.dataset.tab);
 });
+
+/* =========================================================
+   ADMIN / RESET
+   Note: this is a client-side password meant to stop an accidental
+   tap, not real security — anyone who views page source can see it.
+   ========================================================= */
+const ADMIN_PASSWORD = 'goons2026';
+let adminUnlocked = false;
+
+function renderFooter(){
+  const el = document.getElementById('appFooter');
+  if(!adminUnlocked){
+    el.innerHTML = `<a onclick="promptAdmin()">Admin</a>`;
+  } else {
+    el.innerHTML = `<div class="admin-panel">
+      <span class="muted">Admin mode</span>
+      <button class="btn secondary" onclick="lockAdmin()">Exit</button>
+      <button class="btn flag" onclick="confirmReset()">Reset everything</button>
+    </div>`;
+  }
+}
+
+function promptAdmin(){
+  const pw = prompt('Admin password:');
+  if(pw === null) return;
+  if(pw !== ADMIN_PASSWORD){ showToast('Incorrect password'); return; }
+  adminUnlocked = true;
+  renderFooter();
+}
+
+function lockAdmin(){
+  adminUnlocked = false;
+  renderFooter();
+}
+
+async function confirmReset(){
+  const sure = confirm('This permanently erases ALL scores, setup, and pairings for everyone on the trip. This cannot be undone. Continue?');
+  if(!sure) return;
+  state = defaultState();
+  await saveState('Tournament reset');
+  adminUnlocked = false;
+  render();
+}
 
 loadState();
 </script>
