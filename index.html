@@ -267,7 +267,7 @@
     <div class="tabs" id="tabs">
       <div class="tab" data-tab="leaderboard">Leaderboard</div>
       <div class="tab" data-tab="cards">Scorecards</div>
-      <div class="tab" data-tab="setup">Setup</div>
+      <div class="tab" data-tab="setup">Teams</div>
     </div>
   </div>
 </div>
@@ -499,6 +499,31 @@ function tripTotals(){
   return {aTotal, bTotal};
 }
 
+function playerTotalStrokes(name){
+  let total = 0, holes = 0;
+  [1,2].forEach(day=>{
+    state.days[day].matches.forEach(m=>{
+      const arr = m.scores && m.scores[name];
+      if(!arr) return;
+      arr.forEach(v=>{
+        if(v !== '' && v !== undefined && v !== null){
+          total += Number(v);
+          holes++;
+        }
+      });
+    });
+  });
+  return { total, holes };
+}
+
+function playerRosterLine(name){
+  const s = playerTotalStrokes(name);
+  const scoreLabel = s.holes > 0
+    ? ` <span class="muted">— ${s.total} thru ${s.holes}</span>`
+    : '';
+  return `<div style="padding:4px 0;">${escapeHtml(name)}${scoreLabel}</div>`;
+}
+
 /* =========================================================
    RENDER: score strip (always visible)
    ========================================================= */
@@ -531,7 +556,7 @@ function renderLeaderboard(){
     const matches = state.days[day].matches;
     const anySetup = matches.some(m => m.teamA[0] || m.teamB[0]);
     if(!anySetup){
-      html += `<div class="empty-hint"><p>No foursomes set for Day ${day} yet.</p><a onclick="switchTab('setup')">Set up teams and pairings &rarr;</a></div>`;
+      html += `<div class="empty-hint"><p>No foursomes set for Day ${day} yet.</p><a onclick="switchTab('setup')">View teams &amp; pairings &rarr;</a></div>`;
     } else {
       matches.forEach((m, idx)=>{
         const s = matchStatus(m);
@@ -580,7 +605,7 @@ function renderCards(){
   const matches = state.days[currentDay].matches;
   const anySetup = matches.some(m => m.teamA[0] || m.teamB[0]);
   if(!anySetup){
-    html += `<div class="empty-hint"><p>No foursomes set for this day yet.</p><a onclick="switchTab('setup')">Set up teams and pairings &rarr;</a></div>`;
+    html += `<div class="empty-hint"><p>No foursomes set for this day yet.</p><a onclick="switchTab('setup')">View teams &amp; pairings &rarr;</a></div>`;
   } else {
     matches.forEach((m, idx)=>{
       const s = matchStatus(m);
@@ -699,6 +724,59 @@ async function saveMatch(day, idx){
    RENDER: Setup tab
    ========================================================= */
 function renderSetup(){
+  if(adminUnlocked) renderSetupEditor();
+  else renderSetupReadOnly();
+}
+
+function renderSetupReadOnly(){
+  const aPlayers = rosterPlayers('A');
+  const bPlayers = rosterPlayers('B');
+  const unassigned = state.roster.filter(p => !p.team).map(p => p.name);
+
+  let html = `<div class="card">
+    <div style="font-weight:700;color:var(--teamA);">${escapeHtml(teamName('A'))} <span class="muted">(${aPlayers.length}/8)</span></div>
+    <div style="font-weight:700;color:var(--teamB-ink);margin-top:4px;">${escapeHtml(teamName('B'))} <span class="muted">(${bPlayers.length}/8)</span></div>
+  </div>`;
+
+  html += `<div class="card"><h3>Roster</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div>
+        <div class="pairing-label" style="color:var(--teamA);">${escapeHtml(teamName('A'))}</div>
+        ${aPlayers.length ? aPlayers.map(p=>playerRosterLine(p)).join('') : '<div class="muted">No players yet</div>'}
+      </div>
+      <div>
+        <div class="pairing-label" style="color:var(--teamB-ink);">${escapeHtml(teamName('B'))}</div>
+        ${bPlayers.length ? bPlayers.map(p=>playerRosterLine(p)).join('') : '<div class="muted">No players yet</div>'}
+      </div>
+    </div>
+    ${unassigned.length ? `<div style="margin-top:12px;"><div class="pairing-label">Unassigned</div>${unassigned.map(p=>`<div class="muted" style="padding:4px 0;">${escapeHtml(p)}</div>`).join('')}</div>` : ''}
+  </div>`;
+
+  [1,2].forEach(day=>{
+    html += `<div class="card"><h3>Day ${day} foursomes</h3>`;
+    const matches = state.days[day].matches;
+    const anySetup = matches.some(m => m.teamA[0] || m.teamB[0]);
+    if(!anySetup){
+      html += `<p class="muted">No foursomes set for Day ${day} yet.</p>`;
+    } else {
+      matches.forEach((m, idx)=>{
+        const aNames = m.teamA.filter(Boolean).join(' & ') || '(not set)';
+        const bNames = m.teamB.filter(Boolean).join(' & ') || '(not set)';
+        html += `<div class="match-row">
+          <div class="match-players">
+            <div><b>${escapeHtml(aNames)}</b><span class="vs">vs</span><b>${escapeHtml(bNames)}</b></div>
+            <div class="muted">Match ${idx+1}</div>
+          </div>
+        </div>`;
+      });
+    }
+    html += `</div>`;
+  });
+
+  document.getElementById('main').innerHTML = html;
+}
+
+function renderSetupEditor(){
   const countA = rosterPlayers('A').length;
   const countB = rosterPlayers('B').length;
   const unassigned = state.roster.filter(p => !p.team).length;
@@ -717,8 +795,13 @@ function renderSetup(){
     <h3>Roster — assign teams</h3>
     <div class="roster-counts muted">${escapeHtml(teamName('A'))}: ${countA}/8 &nbsp;·&nbsp; ${escapeHtml(teamName('B'))}: ${countB}/8 &nbsp;·&nbsp; Unassigned: ${unassigned}</div>`;
   state.roster.forEach((p, i)=>{
+    const s = playerTotalStrokes(p.name);
+    const scoreBadge = s.holes > 0
+      ? `<span class="muted" style="font-size:11px;white-space:nowrap;">${s.total} thru ${s.holes}</span>`
+      : '';
     html += `<div class="roster-row">
       <input value="${escapeHtml(p.name)}" placeholder="Player name" onchange="setRosterName(${i}, this.value)">
+      ${scoreBadge}
       <div class="team-toggle">
         <div class="team-pill ${p.team==='A' ? 'active-a' : ''}" onclick="toggleRosterTeam(${i},'A')">${escapeHtml(teamName('A'))}</div>
         <div class="team-pill ${p.team==='B' ? 'active-b' : ''}" onclick="toggleRosterTeam(${i},'B')">${escapeHtml(teamName('B'))}</div>
@@ -838,12 +921,12 @@ function promptAdmin(){
   if(pw === null) return;
   if(pw !== ADMIN_PASSWORD){ showToast('Incorrect password'); return; }
   adminUnlocked = true;
-  renderFooter();
+  render();
 }
 
 function lockAdmin(){
   adminUnlocked = false;
-  renderFooter();
+  render();
 }
 
 async function confirmReset(){
