@@ -15,8 +15,8 @@
     --flag:#bd3d28;
     --sand:#b8a369;
     --line:rgba(28,27,23,0.14);
-    --teamA:#1f4d36;
-    --teamB:#bd3d28;
+    --teamA:#b3392c;
+    --teamB:#1f5c86;
     --ok:#2f6b3e;
   }
   *{box-sizing:border-box;}
@@ -109,11 +109,12 @@
   .card{
     background:#fff;
     border:1px solid var(--line);
-    border-radius:10px;
-    padding:16px;
+    border-radius:12px;
+    padding:18px;
     margin-bottom:14px;
+    box-shadow:0 1px 2px rgba(28,27,23,0.05);
   }
-  .card h3{margin:0 0 10px;font-size:18px;color:var(--fairway-dark);}
+  .card h3{margin:0 0 12px;font-size:20px;color:var(--fairway-dark);}
   .muted{color:rgba(28,27,23,0.55);font-size:13px;}
   .eyebrow{
     font-size:10px;letter-spacing:0.14em;text-transform:uppercase;
@@ -150,7 +151,14 @@
   .btn.secondary{background:transparent;color:var(--fairway);border:1px solid var(--fairway);}
   .btn.flag{background:var(--flag);}
   .btn:active{transform:translateY(1px);}
+  .btn:hover{filter:brightness(1.06);}
   .btn[disabled]{opacity:0.4;cursor:default;}
+
+  .empty-hint{
+    border:1px dashed var(--line);border-radius:8px;padding:18px;text-align:center;
+  }
+  .empty-hint p{margin:0 0 8px;color:rgba(28,27,23,0.55);font-size:13px;}
+  .empty-hint a{color:var(--fairway);font-weight:700;font-size:13px;cursor:pointer;}
 
   /* Scorecard entry */
   .scorecard-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;}
@@ -189,18 +197,24 @@
   }
   .team-name-row .a input{border-color:var(--teamA);color:var(--teamA);}
   .team-name-row .b input{border-color:var(--teamB);color:var(--teamB);}
-  .roster-counts{font-size:12px;margin:6px 0 14px;}
+  .roster-counts{font-size:12px;margin:2px 0 14px;color:rgba(28,27,23,0.55);}
   .roster-row{
-    display:flex;gap:8px;align-items:center;margin-bottom:8px;
+    display:flex;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line);
   }
+  .roster-row:first-of-type{border-top:none;padding-top:0;}
   .roster-row input{
     flex:1;padding:8px 9px;border:1px solid var(--line);border-radius:6px;
-    font-size:13px;font-family:'Archivo',sans-serif;
+    font-size:13px;font-family:'Archivo',sans-serif;min-width:0;
   }
-  .roster-row select{
-    padding:8px 6px;border:1px solid var(--line);border-radius:6px;font-size:12px;
-    min-width:118px;background:#fff;
+  .team-toggle{display:flex;gap:5px;flex:0 0 auto;}
+  .team-pill{
+    padding:8px 12px;border-radius:20px;font-size:11px;font-weight:700;
+    letter-spacing:0.02em;cursor:pointer;border:1px solid var(--line);
+    background:#fff;color:rgba(28,27,23,0.5);white-space:nowrap;
+    transition:background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   }
+  .team-pill.active-a{background:var(--teamA);border-color:var(--teamA);color:#fff;}
+  .team-pill.active-b{background:var(--teamB);border-color:var(--teamB);color:#fff;}
   .pairing-block{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;}
   .pairing-match{
     display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;
@@ -474,7 +488,7 @@ function renderScoreStrip(){
       <div class="strip-name">${escapeHtml(teamName('A'))}</div>
       <div class="strip-pts">${aTotal}</div>
     </div>
-    <div class="strip-mid">of 32</div>
+    <div class="strip-mid">⛳ of 32</div>
     <div class="strip-seg strip-b">
       <div class="strip-name">${escapeHtml(teamName('B'))}</div>
       <div class="strip-pts">${bTotal}</div>
@@ -496,7 +510,7 @@ function renderLeaderboard(){
     const matches = state.days[day].matches;
     const anySetup = matches.some(m => m.teamA[0] || m.teamB[0]);
     if(!anySetup){
-      html += `<p class="muted">Foursomes for Day ${day} haven't been set up yet. Head to Setup.</p>`;
+      html += `<div class="empty-hint"><p>No foursomes set for Day ${day} yet.</p><a onclick="switchTab('setup')">Set up teams and pairings &rarr;</a></div>`;
     } else {
       matches.forEach((m, idx)=>{
         const s = matchStatus(m);
@@ -544,7 +558,7 @@ function renderCards(){
   const matches = state.days[currentDay].matches;
   const anySetup = matches.some(m => m.teamA[0] || m.teamB[0]);
   if(!anySetup){
-    html += `<p class="muted">No foursomes set up for this day yet. Go to Setup to add rosters and pairings.</p>`;
+    html += `<div class="empty-hint"><p>No foursomes set for this day yet.</p><a onclick="switchTab('setup')">Set up teams and pairings &rarr;</a></div>`;
   } else {
     matches.forEach((m, idx)=>{
       const s = matchStatus(m);
@@ -681,11 +695,10 @@ function renderSetup(){
   state.roster.forEach((p, i)=>{
     html += `<div class="roster-row">
       <input value="${escapeHtml(p.name)}" placeholder="Player name" onchange="setRosterName(${i}, this.value)">
-      <select onchange="setRosterTeam(${i}, this.value)">
-        <option value="" ${!p.team ? 'selected' : ''}>Unassigned</option>
-        <option value="A" ${p.team==='A' ? 'selected' : ''}>${escapeHtml(teamName('A'))}</option>
-        <option value="B" ${p.team==='B' ? 'selected' : ''}>${escapeHtml(teamName('B'))}</option>
-      </select>
+      <div class="team-toggle">
+        <div class="team-pill ${p.team==='A' ? 'active-a' : ''}" onclick="toggleRosterTeam(${i},'A')">${escapeHtml(teamName('A'))}</div>
+        <div class="team-pill ${p.team==='B' ? 'active-b' : ''}" onclick="toggleRosterTeam(${i},'B')">${escapeHtml(teamName('B'))}</div>
+      </div>
     </div>`;
   });
   html += `</div>`;
@@ -731,9 +744,12 @@ function playerSelect(day, idx, teamKey, slot, current){
   return `<select onchange="setPairing(${day},${idx},'${teamKey}',${slot}, this.value)">${opts}</select>`;
 }
 
-function setTeamName(letter, val){ state.teamNames[letter] = val; }
-function setRosterName(i, val){ state.roster[i].name = val; }
-function setRosterTeam(i, val){ state.roster[i].team = val || null; }
+function setTeamName(letter, val){ state.teamNames[letter] = val; renderSetup(); }
+function setRosterName(i, val){ state.roster[i].name = val; renderSetup(); }
+function toggleRosterTeam(i, letter){
+  state.roster[i].team = (state.roster[i].team === letter) ? null : letter;
+  renderSetup(); // reflect immediately so the pairing dropdowns below pick up the change
+}
 function setPairing(day, idx, teamKey, slot, val){
   state.days[day].matches[idx][teamKey][slot] = val;
 }
@@ -759,12 +775,16 @@ function render(){
   else renderSetup();
 }
 
+function switchTab(name){
+  currentTab = name;
+  openMatchId = null;
+  render();
+}
+
 document.getElementById('tabs').addEventListener('click', (e)=>{
   const tab = e.target.closest('.tab');
   if(!tab) return;
-  currentTab = tab.dataset.tab;
-  openMatchId = null;
-  render();
+  switchTab(tab.dataset.tab);
 });
 
 loadState();
