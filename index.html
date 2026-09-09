@@ -182,13 +182,24 @@
   }
 
   /* Setup */
-  .roster-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
-  .roster-col h4{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;}
-  .roster-col.a h4{color:var(--teamA);}
-  .roster-col.b h4{color:var(--teamB);}
-  .roster-col input{
-    width:100%;padding:8px 9px;margin-bottom:6px;border:1px solid var(--line);
-    border-radius:6px;font-size:13px;font-family:'Archivo',sans-serif;
+  .team-name-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:4px;}
+  .team-name-row input{
+    width:100%;padding:8px 9px;border:1px solid var(--line);border-radius:6px;
+    font-size:13px;font-weight:700;font-family:'Archivo',sans-serif;
+  }
+  .team-name-row .a input{border-color:var(--teamA);color:var(--teamA);}
+  .team-name-row .b input{border-color:var(--teamB);color:var(--teamB);}
+  .roster-counts{font-size:12px;margin:6px 0 14px;}
+  .roster-row{
+    display:flex;gap:8px;align-items:center;margin-bottom:8px;
+  }
+  .roster-row input{
+    flex:1;padding:8px 9px;border:1px solid var(--line);border-radius:6px;
+    font-size:13px;font-family:'Archivo',sans-serif;
+  }
+  .roster-row select{
+    padding:8px 6px;border:1px solid var(--line);border-radius:6px;font-size:12px;
+    min-width:118px;background:#fff;
   }
   .pairing-block{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;}
   .pairing-match{
@@ -230,11 +241,36 @@
 <main id="main"></main>
 <div class="toast" id="toast"></div>
 
+<!-- Firebase (compat SDK — no build step needed) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
 <script>
+/* =========================================================
+   FIREBASE
+   ========================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyD4Ty4AZlnTnfgvNA9YGh7YWCNIBCFhsQQ",
+  authDomain: "goonsgolftrip.firebaseapp.com",
+  databaseURL: "https://goonsgolftrip-default-rtdb.firebaseio.com",
+  projectId: "goonsgolftrip",
+  storageBucket: "goonsgolftrip.firebasestorage.app",
+  messagingSenderId: "895114600744",
+  appId: "1:895114600744:web:a76a2b9013b6880110301d"
+};
+firebase.initializeApp(firebaseConfig);
+const dataRef = firebase.database().ref('trip-data');
+
 /* =========================================================
    STATE
    ========================================================= */
-const STORAGE_KEY = 'trip-data';
+const ROSTER_NAMES = [
+  'T Parker','A Klemencic','D Morrow','A Windover',
+  'B Parker','Jo Williamson','A Bryden','M Williams',
+  'A Williamson','M Bryden','M Brown','T Stevenson',
+  'G Parker','J Briand','A Auger','S Kerr'
+];
+
 let state = null;
 let currentTab = 'leaderboard';
 let currentDay = 1;
@@ -242,10 +278,14 @@ let openMatchId = null; // "1-2" (day-matchIndex) when editing a scorecard
 
 function emptyMatch(){ return { teamA:['',''], teamB:['',''], scores:{} }; }
 
+function defaultRoster(){
+  return ROSTER_NAMES.map(name => ({ name, team: null }));
+}
+
 function defaultState(){
   return {
-    teams:{ A:{name:'Team Red', players:['Player 1','Player 2','Player 3','Player 4','Player 5','Player 6','Player 7','Player 8']},
-            B:{name:'Team Blue', players:['Player 9','Player 10','Player 11','Player 12','Player 13','Player 14','Player 15','Player 16']} },
+    roster: defaultRoster(),
+    teamNames: { A: 'Team Red', B: 'Team Blue' },
     days:{
       1:{ matches:[emptyMatch(),emptyMatch(),emptyMatch(),emptyMatch()] },
       2:{ matches:[emptyMatch(),emptyMatch(),emptyMatch(),emptyMatch()] }
@@ -253,27 +293,73 @@ function defaultState(){
   };
 }
 
+// Firebase RTDB drops empty arrays/objects and can hand back arrays as
+// objects with numeric keys — this fills in anything missing or malformed
+// so the rest of the app can assume a consistent shape.
+function normalizeState(raw){
+  const base = defaultState();
+  if(!raw || typeof raw !== 'object') return base;
+
+  const out = { roster: base.roster, teamNames: base.teamNames, days: base.days };
+
+  if(Array.isArray(raw.roster) && raw.roster.length){
+    out.roster = raw.roster.map((p,i) => ({
+      name: (p && p.name) || ROSTER_NAMES[i] || `Player ${i+1}`,
+      team: (p && (p.team === 'A' || p.team === 'B')) ? p.team : null
+    }));
+  }
+  if(raw.teamNames){
+    out.teamNames = {
+      A: raw.teamNames.A || base.teamNames.A,
+      B: raw.teamNames.B || base.teamNames.B
+    };
+  }
+  [1,2].forEach(day=>{
+    const rd = raw.days && raw.days[day];
+    if(rd && Array.isArray(rd.matches)){
+      out.days[day] = { matches: [0,1,2,3].map(i => normalizeMatch(rd.matches[i])) };
+    }
+  });
+  return out;
+}
+
+function normalizeMatch(m){
+  if(!m) return emptyMatch();
+  const fixSide = side => Array.isArray(side) ? [side[0]||'', side[1]||''] : ['',''];
+  return {
+    teamA: fixSide(m.teamA),
+    teamB: fixSide(m.teamB),
+    scores: (m.scores && typeof m.scores === 'object') ? m.scores : {}
+  };
+}
+
 async function loadState(){
   try{
-    const res = await window.storage.get(STORAGE_KEY, true);
-    state = res ? JSON.parse(res.value) : defaultState();
+    const snap = await dataRef.once('value');
+    if(snap.exists()){
+      state = normalizeState(snap.val());
+    } else {
+      state = defaultState();
+      await dataRef.set(state);
+    }
   }catch(e){
     state = defaultState();
+    showToast('Could not connect — showing local copy only');
   }
   render();
+
+  // Live sync: pick up changes from other devices automatically.
+  dataRef.on('value', snap=>{
+    if(openMatchId) return; // don't yank a scorecard out from under someone typing
+    if(!snap.exists()) return;
+    state = normalizeState(snap.val());
+    render();
+  });
 }
 
 async function saveState(msg){
   try{
-    // re-fetch first to reduce clobbering someone else's concurrent edit
-    let latest = state;
-    try{
-      const res = await window.storage.get(STORAGE_KEY, true);
-      if(res) latest = JSON.parse(res.value);
-    }catch(e){ /* no existing value yet */ }
-    // merge: our in-memory `state` wins for the parts we just edited,
-    // but we still write the whole object since edits are per-screen.
-    await window.storage.set(STORAGE_KEY, JSON.stringify(state), true);
+    await dataRef.set(state);
     if(msg) showToast(msg);
   }catch(e){
     showToast('Could not save — check connection');
@@ -288,11 +374,20 @@ function showToast(msg){
   showToast._h = setTimeout(()=>t.classList.remove('show'), 2200);
 }
 
+function teamName(letter){
+  return (state.teamNames && state.teamNames[letter]) || (letter === 'A' ? 'Team Red' : 'Team Blue');
+}
+
+function rosterPlayers(letter){
+  return state.roster.filter(p => p.team === letter).map(p => p.name);
+}
+
 /* =========================================================
    SCORING LOGIC
    Front nine (holes 0-8)  -> best ball match play
    Back nine  (holes 9-17) -> hi-lo match play
    Win = 2 pts, Tie = 1 pt each, per nine, per match
+   A tied hole awards no points to either side.
    ========================================================= */
 function holeScores(match, holeIdx){
   const aNames = match.teamA, bNames = match.teamB;
@@ -320,7 +415,7 @@ function computeNine(match, mode){
       const aBest = Math.min(...a), bBest = Math.min(...b);
       if(aBest < bBest) aHoles++;
       else if(bBest < aBest) bHoles++;
-      else halved++;
+      else halved++; // tie: no points either side
     } else {
       const aLow = Math.min(...a), aHigh = Math.max(...a);
       const bLow = Math.min(...b), bHigh = Math.max(...b);
@@ -374,16 +469,14 @@ function tripTotals(){
    ========================================================= */
 function renderScoreStrip(){
   const {aTotal, bTotal} = tripTotals();
-  const nameA = state.teams.A.name || 'Team A';
-  const nameB = state.teams.B.name || 'Team B';
   document.getElementById('scoreStrip').innerHTML = `
     <div class="strip-seg strip-a">
-      <div class="strip-name">${escapeHtml(nameA)}</div>
+      <div class="strip-name">${escapeHtml(teamName('A'))}</div>
       <div class="strip-pts">${aTotal}</div>
     </div>
     <div class="strip-mid">of 32</div>
     <div class="strip-seg strip-b">
-      <div class="strip-name">${escapeHtml(nameB)}</div>
+      <div class="strip-name">${escapeHtml(teamName('B'))}</div>
       <div class="strip-pts">${bTotal}</div>
     </div>`;
 }
@@ -396,8 +489,6 @@ function escapeHtml(s){
    RENDER: Leaderboard tab
    ========================================================= */
 function renderLeaderboard(){
-  const nameA = state.teams.A.name || 'Team A';
-  const nameB = state.teams.B.name || 'Team B';
   let html = '';
 
   [1,2].forEach(day=>{
@@ -415,7 +506,7 @@ function renderLeaderboard(){
         html += `<div class="match-row">
           <div class="match-players">
             <div><b>${escapeHtml(aNames)}</b><span class="vs">vs</span><b>${escapeHtml(bNames)}</b></div>
-            <div class="muted">Match ${idx+1} · ${nameA} ${s.aPts}–${s.bPts} ${nameB}</div>
+            <div class="muted">Match ${idx+1} · ${teamName('A')} ${s.aPts}–${s.bPts} ${teamName('B')}</div>
           </div>
           <span class="status-pill ${pillClass}">${s.label}</span>
         </div>`;
@@ -427,8 +518,9 @@ function renderLeaderboard(){
   html += `<div class="rules-note">
     <b>How scoring works:</b> Each foursome (2 vs 2) plays a full 18. The front nine is scored
     best-ball match play (each side's lower score wins the hole). The back nine is hi-lo
-    (low ball vs low ball, and high ball vs high ball, each worth a point). Each nine is worth
-    2 points for a win, 1 point each for a tie — 4 points per match, 16 per day, 32 for the trip.
+    (low ball vs low ball, and high ball vs high ball, each worth a point). A tied hole scores
+    no points for either side. Each nine is worth 2 points for a win, 1 point each for a tie —
+    4 points per match, 16 per day, 32 for the trip.
   </div>`;
 
   document.getElementById('main').innerHTML = html;
@@ -442,8 +534,6 @@ function renderCards(){
     renderScorecardEntry(openMatchId);
     return;
   }
-  const nameA = state.teams.A.name || 'Team A';
-  const nameB = state.teams.B.name || 'Team B';
 
   let html = `<div class="day-toggle">
     <div class="day-btn ${currentDay===1?'active':''}" onclick="setDay(1)">Day 1</div>
@@ -492,8 +582,6 @@ function closeMatch(){
 function renderScorecardEntry(id){
   const [day, idx] = id.split('-').map(Number);
   const match = state.days[day].matches[idx];
-  const nameA = state.teams.A.name || 'Team A';
-  const nameB = state.teams.B.name || 'Team B';
   const allPlayers = [...match.teamA, ...match.teamB];
 
   if(!match.scores) match.scores = {};
@@ -518,7 +606,7 @@ function renderScorecardEntry(id){
   html += buildScoreTable(match, allPlayers, 0, 9, day, idx);
   html += `<div class="save-row">
     <span class="muted">${bb.holesPlayed}/9 holes entered</span>
-    ${bb.complete ? `<span class="result-chip" style="background:#e3efe6;color:var(--ok);">${bb.resultLabel} · ${nameA} ${bb.aPts}–${bb.bPts} ${nameB}</span>` : ''}
+    ${bb.complete ? `<span class="result-chip" style="background:#e3efe6;color:var(--ok);">${bb.resultLabel} · ${teamName('A')} ${bb.aPts}–${bb.bPts} ${teamName('B')}</span>` : ''}
   </div>`;
 
   // BACK NINE
@@ -526,7 +614,7 @@ function renderScorecardEntry(id){
   html += buildScoreTable(match, allPlayers, 9, 18, day, idx);
   html += `<div class="save-row">
     <span class="muted">${hl.holesPlayed}/9 holes entered</span>
-    ${hl.complete ? `<span class="result-chip" style="background:#e3efe6;color:var(--ok);">${hl.resultLabel} · ${nameA} ${hl.aPts}–${hl.bPts} ${nameB}</span>` : ''}
+    ${hl.complete ? `<span class="result-chip" style="background:#e3efe6;color:var(--ok);">${hl.resultLabel} · ${teamName('A')} ${hl.aPts}–${hl.bPts} ${teamName('B')}</span>` : ''}
   </div>`;
 
   html += `<div class="save-row">
@@ -575,32 +663,46 @@ async function saveMatch(day, idx){
    RENDER: Setup tab
    ========================================================= */
 function renderSetup(){
-  let html = `<div class="card"><h3>Rosters</h3><div class="roster-grid">`;
-  ['A','B'].forEach(key=>{
-    html += `<div class="roster-col ${key.toLowerCase()}">
-      <input value="${escapeHtml(state.teams[key].name)}" placeholder="Team ${key} name"
-        style="font-weight:700;margin-bottom:10px;" onchange="setTeamName('${key}', this.value)">`;
-    state.teams[key].players.forEach((p, i)=>{
-      html += `<input value="${escapeHtml(p)}" placeholder="Player ${i+1}"
-        onchange="setPlayerName('${key}',${i}, this.value)">`;
-    });
-    html += `</div>`;
+  const countA = rosterPlayers('A').length;
+  const countB = rosterPlayers('B').length;
+  const unassigned = state.roster.filter(p => !p.team).length;
+
+  let html = `<div class="card">
+    <h3>Team names</h3>
+    <div class="team-name-row">
+      <div class="a"><input value="${escapeHtml(teamName('A'))}" onchange="setTeamName('A', this.value)"></div>
+      <div class="b"><input value="${escapeHtml(teamName('B'))}" onchange="setTeamName('B', this.value)"></div>
+    </div>
+  </div>`;
+
+  html += `<div class="card">
+    <h3>Roster — assign teams</h3>
+    <div class="roster-counts muted">${escapeHtml(teamName('A'))}: ${countA}/8 &nbsp;·&nbsp; ${escapeHtml(teamName('B'))}: ${countB}/8 &nbsp;·&nbsp; Unassigned: ${unassigned}</div>`;
+  state.roster.forEach((p, i)=>{
+    html += `<div class="roster-row">
+      <input value="${escapeHtml(p.name)}" placeholder="Player name" onchange="setRosterName(${i}, this.value)">
+      <select onchange="setRosterTeam(${i}, this.value)">
+        <option value="" ${!p.team ? 'selected' : ''}>Unassigned</option>
+        <option value="A" ${p.team==='A' ? 'selected' : ''}>${escapeHtml(teamName('A'))}</option>
+        <option value="B" ${p.team==='B' ? 'selected' : ''}>${escapeHtml(teamName('B'))}</option>
+      </select>
+    </div>`;
   });
-  html += `</div></div>`;
+  html += `</div>`;
 
   [1,2].forEach(day=>{
     html += `<div class="card"><h3>Day ${day} foursomes</h3>
-      <p class="muted" style="margin-top:-6px;">Pick 2 ${escapeHtml(state.teams.A.name)} players and 2 ${escapeHtml(state.teams.B.name)} players for each match.</p>
+      <p class="muted" style="margin-top:-6px;">Pick 2 ${escapeHtml(teamName('A'))} players and 2 ${escapeHtml(teamName('B'))} players for each match.</p>
       <div class="pairing-block">`;
     state.days[day].matches.forEach((m, idx)=>{
       html += `<div class="pairing-match">
         <div>
-          <div class="pairing-label" style="color:var(--teamA);">${escapeHtml(state.teams.A.name)} pair — Match ${idx+1}</div>
+          <div class="pairing-label" style="color:var(--teamA);">${escapeHtml(teamName('A'))} pair — Match ${idx+1}</div>
           ${playerSelect(day, idx, 'teamA', 0, m.teamA[0])}
           ${playerSelect(day, idx, 'teamA', 1, m.teamA[1])}
         </div>
         <div>
-          <div class="pairing-label" style="color:var(--teamB);">${escapeHtml(state.teams.B.name)} pair — Match ${idx+1}</div>
+          <div class="pairing-label" style="color:var(--teamB);">${escapeHtml(teamName('B'))} pair — Match ${idx+1}</div>
           ${playerSelect(day, idx, 'teamB', 0, m.teamB[0])}
           ${playerSelect(day, idx, 'teamB', 1, m.teamB[1])}
         </div>
@@ -621,7 +723,7 @@ function renderSetup(){
 
 function playerSelect(day, idx, teamKey, slot, current){
   const teamLetter = teamKey === 'teamA' ? 'A' : 'B';
-  const players = state.teams[teamLetter].players.filter(Boolean);
+  const players = rosterPlayers(teamLetter);
   let opts = `<option value="">Select player</option>`;
   players.forEach(p=>{
     opts += `<option value="${escapeHtml(p)}" ${p===current?'selected':''}>${escapeHtml(p)}</option>`;
@@ -629,8 +731,9 @@ function playerSelect(day, idx, teamKey, slot, current){
   return `<select onchange="setPairing(${day},${idx},'${teamKey}',${slot}, this.value)">${opts}</select>`;
 }
 
-function setTeamName(key, val){ state.teams[key].name = val; }
-function setPlayerName(key, i, val){ state.teams[key].players[i] = val; }
+function setTeamName(letter, val){ state.teamNames[letter] = val; }
+function setRosterName(i, val){ state.roster[i].name = val; }
+function setRosterTeam(i, val){ state.roster[i].team = val || null; }
 function setPairing(day, idx, teamKey, slot, val){
   state.days[day].matches[idx][teamKey][slot] = val;
 }
@@ -639,7 +742,8 @@ async function saveSetup(){
   await saveState('Setup saved for everyone');
   renderScoreStrip();
   document.getElementById('setupLine').textContent =
-    `${state.teams.A.name} vs ${state.teams.B.name} · 16 players · 2 days`;
+    `${teamName('A')} vs ${teamName('B')} · 16 players · 2 days`;
+  renderSetup(); // refresh roster counts
 }
 
 /* =========================================================
@@ -664,21 +768,6 @@ document.getElementById('tabs').addEventListener('click', (e)=>{
 });
 
 loadState();
-
-// light polling so everyone sees new scores without a manual refresh
-setInterval(async ()=>{
-  if(openMatchId) return; // don't yank the table out from under someone typing
-  try{
-    const res = await window.storage.get(STORAGE_KEY, true);
-    if(res){
-      const fresh = JSON.stringify(JSON.parse(res.value));
-      if(fresh !== JSON.stringify(state)){
-        state = JSON.parse(fresh);
-        render();
-      }
-    }
-  }catch(e){ /* ignore */ }
-}, 7000);
 </script>
 </body>
 </html>
